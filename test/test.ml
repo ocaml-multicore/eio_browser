@@ -1,12 +1,9 @@
 (* Avoiding dependency on js_of_ocaml *)
-external set_channel_output' :
-  out_channel -> Jv.t -> unit
+external set_channel_output' : out_channel -> Jv.t -> unit
   = "caml_ml_set_channel_output"
 
 let set_channel_flusher (out_channel : out_channel) (f : string -> unit) =
-  let f' =
-    Jv.callback ~arity:1 (fun s -> f (Jstr.binary_to_octets s))
-  in
+  let f' = Jv.callback ~arity:1 (fun s -> f (Jstr.binary_to_octets s)) in
   set_channel_output' out_channel f'
 
 let init () =
@@ -29,10 +26,10 @@ let init () =
     match Document.find_el_by_id G.document (Jstr.v name) with
     | Some v -> v
     | None ->
-      let d = El.div [] in
-      El.append_children output [ d ];
-      El.(set_prop Prop.id (Jstr.v name) d);
-      d
+        let d = El.div [] in
+        El.append_children output [ d ];
+        El.(set_prop Prop.id (Jstr.v name) d);
+        d
   in
   let append name s =
     let s = Ansi.process parser s in
@@ -51,22 +48,24 @@ module Browser_tests = struct
   let test_timeout_cancel () =
     let v =
       Fiber.first
-        (fun () -> Eio_browser.Timeout.sleep ~ms:5000; "A")
+        (fun () ->
+          Eio_browser.Timeout.sleep ~ms:5000;
+          "A")
         (fun () -> "B")
     in
     Alcotest.(check string) "timeout cancelled" "B" v
 
   let test_fut_await () =
     let p, r = Fut.create () in
-    Fiber.both
-      (fun () -> Eio_browser.await p)
-      (fun () -> r ())
+    Fiber.both (fun () -> Eio_browser.await p) (fun () -> r ())
 
   let test_fut_cancel () =
     let p, _ = Fut.create () in
     let v =
       Fiber.first
-        (fun () -> Eio_browser.await p; "A")
+        (fun () ->
+          Eio_browser.await p;
+          "A")
         (fun () -> "B")
     in
     Alcotest.(check string) "fut cancelled" "B" v
@@ -76,7 +75,11 @@ module Browser_tests = struct
   let test_multiple_timeouts () =
     let lst = List.init 100 Fun.id in
     let v =
-      Fiber.List.map (fun v -> Eio_browser.Timeout.sleep ~ms:100; v) lst
+      Fiber.List.map
+        (fun v ->
+          Eio_browser.Timeout.sleep ~ms:100;
+          v)
+        lst
     in
     Alcotest.(check (list int)) "timeouts" lst v
 
@@ -90,31 +93,39 @@ module Browser_tests = struct
     in
     Fiber.yield ();
     Eio_browser.Timeout.sleep ~ms:10;
-    Fiber.first
-      loop
-      (fun () -> Eio_browser.Timeout.sleep ~ms:10);
+    Fiber.first loop (fun () -> Eio_browser.Timeout.sleep ~ms:10);
     if !i > 1000000 then Alcotest.fail "Yielding was not cancelled"
 
-  let tests = [
-    Alcotest.test_case "timeout cancelled" `Quick test_timeout_cancel;
-    Alcotest.test_case "fut await" `Quick test_fut_await;
-    Alcotest.test_case "fut cancelled" `Quick test_fut_cancel;
-    Alcotest.test_case "test timeout" `Quick test_timeout;
-    Alcotest.test_case "test multiple timeouts" `Quick test_multiple_timeouts;
-    Alcotest.test_case "test busy yielding" `Quick test_busy_yielding;
-  ]
-end
+  let test_global_switch () =
+    let p, r = Promise.create () in
+    Fiber.fork ~sw:(Eio_browser.global_switch ()) (fun () ->
+        Promise.resolve r 10);
+    Alcotest.(check int) "same int" 10 (Promise.await p)
 
+  let tests =
+    [
+      Alcotest.test_case "timeout cancelled" `Quick test_timeout_cancel;
+      Alcotest.test_case "fut await" `Quick test_fut_await;
+      Alcotest.test_case "fut cancelled" `Quick test_fut_cancel;
+      Alcotest.test_case "test timeout" `Quick test_timeout;
+      Alcotest.test_case "test multiple timeouts" `Quick test_multiple_timeouts;
+      Alcotest.test_case "test busy yielding" `Quick test_busy_yielding;
+      Alcotest.test_case "test global switch" `Quick test_global_switch;
+    ]
+end
 
 let () =
   init ();
   let main =
     Eio_browser.run @@ fun () ->
-    try Alcotest.run ~and_exit:false "eio" [
-        "fibers", Eio_test.Fibers.tests;
-        "stream", Eio_test.Stream.tests;
-        "promises", Eio_test.Promises.tests;
-        "browser", Browser_tests.tests
-      ] with Exit -> ()
+    try
+      Alcotest.run ~and_exit:false "eio"
+        [
+          ("fibers", Eio_test.Fibers.tests);
+          ("stream", Eio_test.Stream.tests);
+          ("promises", Eio_test.Promises.tests);
+          ("browser", Browser_tests.tests);
+        ]
+    with Exit -> ()
   in
   Fut.await main (fun () -> ())

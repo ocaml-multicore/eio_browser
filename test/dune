@@ -7,7 +7,8 @@
  (name test)
  (modules test)
  (modes js)
- (js_of_ocaml (flags --enable=effects --setenv=ALCOTEST_COLOR=always))
+ (js_of_ocaml
+  (flags --enable=effects --setenv=ALCOTEST_COLOR=always))
  (libraries alcotest ansi eio_test eio_browser))
 
 (rule
@@ -15,4 +16,5 @@
  (package eio_browser)
  (deps index.html test.bc.js)
  (targets test.js)
- (action (copy test.bc.js test.js)))
+ (action
+  (copy test.bc.js test.js)))
